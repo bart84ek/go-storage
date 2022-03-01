@@ -123,8 +123,9 @@ func (s *Storage) metadata(opt pairStorageMetadata) (meta *types.StorageMeta) {
 func (s *Storage) nextObjectPageByDir(ctx context.Context, page *types.ObjectPage) error {
 	input := page.Status.(*objectPageStatus)
 	it := s.bucket.Objects(ctx, &gs.Query{
-		Prefix:    input.prefix,
-		Delimiter: input.delimiter,
+		Prefix:      input.prefix,
+		Delimiter:   input.delimiter,
+		StartOffset: input.offset,
 	})
 	remaining := 200
 	for remaining > 0 {
@@ -155,13 +156,18 @@ func (s *Storage) nextObjectPageByDir(ctx context.Context, page *types.ObjectPag
 		page.Data = append(page.Data, o)
 		remaining -= 1
 	}
+	if remaining == 0 {
+		page.Data, input.offset = offsetData(page.Data)
+		return nil
+	}
 	return nil
 }
 
 func (s *Storage) nextObjectPageByPrefix(ctx context.Context, page *types.ObjectPage) error {
 	input := page.Status.(*objectPageStatus)
 	it := s.bucket.Objects(ctx, &gs.Query{
-		Prefix: input.prefix,
+		Prefix:      input.prefix,
+		StartOffset: input.offset,
 	})
 	remaining := 200
 	for remaining > 0 {
@@ -178,6 +184,10 @@ func (s *Storage) nextObjectPageByPrefix(ctx context.Context, page *types.Object
 		}
 		page.Data = append(page.Data, o)
 		remaining -= 1
+	}
+	if remaining == 0 {
+		page.Data, input.offset = offsetData(page.Data)
+		return nil
 	}
 	return nil
 }
